@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  review_details: false
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+      - "[skip review]"
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "renovate[bot]"
+  path_instructions:
+    - path: "**/*.{js,ts,mjs,cjs}"
+      instructions: |
+        Prioritize correctness, async error handling, CLI behavior, test coverage,
+        and backward-compatible public contracts.
+    - path: "**/*.md"
+      instructions: |
+        Treat stale setup commands, broken links, and docs that disagree with the
+        implemented CLI behavior as actionable review findings.
+
+chat:
+  auto_reply: true
+  art: false
+  allow_non_org_members: false
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "**/AGENTS.md"
+      - "README.md"
+      - "docs/**/*.md"
+  learnings:
+    scope: "global"
+  issues:
+    scope: "global"
+  pull_requests:
+    scope: "global"
