@@ -17,7 +17,7 @@ commands:
   verify:
     - "test -s README.md && test -s .coderabbit.yaml"
     - "grep -q '^reviews:' .coderabbit.yaml && grep -q '^knowledge_base:' .coderabbit.yaml"
-    - "test -f skills/gh-link-issue-pr/SKILL.md && test -f skills/kaizen-bug-router/SKILL.md && test -f skills/pr-guardian/SKILL.md"
+    - "test -f skills/gh-link-issue-pr/SKILL.md && test -f skills/gh-link-issue-pr/agents/openai.yaml && test -f skills/kaizen-bug-router/SKILL.md && test -f skills/kaizen-bug-router/agents/openai.yaml && test -f skills/pr-guardian/SKILL.md"
   verifyTimeoutMinutes: 15
 builder:
   command: builder-agent
