@@ -1,10 +1,36 @@
 # Kaizen Agents CodeRabbit Configuration
 
-This repository stores the organization-wide CodeRabbit configuration for
-`kaizen-agents-org`.
+This repository stores the shared CodeRabbit configuration for `kaizen-agents-org`.
 
-CodeRabbit applies `.coderabbit.yaml` from this repository to repositories that
-do not define their own `.coderabbit.yaml`.
+CodeRabbit uses `.coderabbit.yaml` from this repository as the organization-level configuration source for repositories that do not define their own `.coderabbit.yaml`.
+
+## Review Flow
+
+```mermaid
+flowchart LR
+    PR["Pull request<br/>in a Kaizen Agents repo"] --> Eligible{"eligible?"}
+    Eligible -->|draft / WIP / dependency bot| Skip["skip auto review"]
+    Eligible -->|non-draft human PR| Config["load coderabbit/.coderabbit.yaml"]
+    Config --> Review["CodeRabbit review<br/>assertive profile"]
+    Review --> Findings["summary, status,<br/>actionable findings"]
+    Findings --> Gate{"blocking issue?"}
+    Gate -->|yes| Changes["request changes"]
+    Gate -->|no| Continue["leave review context<br/>for human maintainer"]
+```
+
+## What The Configuration Does
+
+| Area | Setting | Effect |
+|---|---|---|
+| Review profile | `reviews.profile: assertive` | Favors direct, actionable findings. |
+| Review workflow | `request_changes_workflow: true` | Allows CodeRabbit to request changes for blocking findings. |
+| Summaries | `high_level_summary: true`, `review_status: true` | Adds PR-level summary and status output. |
+| Noise reduction | `review_details: false`, `poem: false`, `chat.art: false` | Avoids decorative or verbose review output. |
+| Auto review | `auto_review.enabled: true` | Reviews eligible non-draft PRs automatically. |
+| Incremental review | `auto_incremental_review: true` | Reviews new pushes after the initial review. |
+| Skip rules | draft PRs, WIP titles, dependency bots | Keeps routine or unfinished PRs out of review. |
+| Path instructions | JS/TS and Markdown rules | Biases review toward contracts, CLI behavior, tests, and stale docs. |
+| Knowledge base | `AGENTS.md`, README, docs | Lets CodeRabbit learn repository conventions from committed guidance. |
 
 ## Required Setup
 
@@ -25,12 +51,13 @@ do not define their own `.coderabbit.yaml`.
 
 ## Review Behavior
 
-- CodeRabbit automatically reviews non-draft pull requests targeting each
-  repository's default branch.
-- Incremental reviews run on new pushes.
-- Draft PRs and PRs titled `WIP`, `DO NOT MERGE`, or `[skip review]` are skipped.
-- `dependabot[bot]` and `renovate[bot]` PRs are skipped.
-- CodeRabbit can request changes for blocking review findings.
+CodeRabbit automatically reviews non-draft pull requests targeting each repository's default branch.
+
+Reviews are skipped when:
+
+- The PR is a draft.
+- The title contains `WIP`, `DO NOT MERGE`, or `[skip review]`.
+- The author is `dependabot[bot]` or `renovate[bot]`.
 
 Manual review commands:
 
@@ -38,6 +65,16 @@ Manual review commands:
 @coderabbitai review
 @coderabbitai full review
 ```
+
+## Change Guidelines
+
+When changing `.coderabbit.yaml`:
+
+1. Keep the YAML schema line at the top of the file.
+2. Prefer organization-wide rules only; repository-specific exceptions should usually live in the target repository.
+3. Keep review instructions focused on correctness, security, release risk, tests, CLI behavior, and documentation drift.
+4. Validate YAML syntax before opening a PR.
+5. Confirm that CodeRabbit still recognizes this repository as the configuration source after merge.
 
 ## Codex Review Setup
 
@@ -48,11 +85,10 @@ Codex code review is configured in ChatGPT, not in this repository:
 3. Turn on Code review for each repository.
 4. Optionally turn on Automatic reviews.
 
-Manual review command:
+Manual Codex review command:
 
 ```md
 @codex review
 ```
 
-Codex reads `AGENTS.md` review guidance in each repository when reviewing pull
-requests.
+Codex reads each repository's `AGENTS.md` review guidance when reviewing pull requests.
