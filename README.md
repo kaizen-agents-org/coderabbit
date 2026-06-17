@@ -25,7 +25,7 @@ flowchart LR
 | Review profile | `reviews.profile: assertive` | Favors direct, actionable findings. |
 | Review workflow | `request_changes_workflow: true` | Allows CodeRabbit to request changes for blocking findings. |
 | Summaries | `high_level_summary: true`, `review_status: true` | Adds PR-level summary and status output. |
-| Noise reduction | `review_details: false`, `poem: false`, `chat.art: false` | Avoids decorative or verbose review output. |
+| Noise reduction | `review_details: false`, `poem: false` | Avoids decorative or verbose review output. |
 | Auto review | `auto_review.enabled: true` | Reviews eligible non-draft PRs automatically. |
 | Incremental review | `auto_incremental_review: true` | Reviews new pushes after the initial review. |
 | Skip rules | draft PRs, WIP titles, dependency bots | Keeps routine or unfinished PRs out of review. |
