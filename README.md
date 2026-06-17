@@ -11,11 +11,16 @@ do not define their own `.coderabbit.yaml`.
 1. Install the CodeRabbit GitHub App for `kaizen-agents-org`.
 2. Include the `kaizen-agents-org/coderabbit` repository in the installation.
 3. Include every repository that should receive CodeRabbit reviews:
+   - `.github`
    - `builder-agent`
    - `kaizen-loop`
+   - `renovate-config`
    - `verifier`
-   - `.github`
-4. Open a pull request in a configured repository and confirm CodeRabbit reports
+4. Treat `coderabbit` as a special case: it must be included in the app
+   installation so shared configuration changes are reviewed and validated, but
+   it is the configuration source rather than a downstream repository inheriting
+   that configuration.
+5. Open a pull request in a configured repository and confirm CodeRabbit reports
    `Repository: coderabbit/.coderabbit.yaml` as the configuration source.
 
 ## Review Behavior

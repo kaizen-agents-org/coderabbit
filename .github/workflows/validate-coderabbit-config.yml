@@ -1,0 +1,92 @@
+name: Validate CodeRabbit config
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: validate-coderabbit-config-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Mirror Kaizen verification intent
+        run: |
+          test -s README.md
+          test -s .coderabbit.yaml
+          grep -q '^reviews:' .coderabbit.yaml
+          grep -q '^knowledge_base:' .coderabbit.yaml
+          test -f skills/gh-link-issue-pr/SKILL.md
+          test -f skills/gh-link-issue-pr/agents/openai.yaml
+          test -f skills/kaizen-bug-router/SKILL.md
+          test -f skills/kaizen-bug-router/agents/openai.yaml
+          test -f skills/pr-guardian/SKILL.md
+
+      - name: Validate YAML syntax and shape
+        run: |
+          ruby <<'RUBY'
+          require "yaml"
+
+          def load_mapping(path)
+            data = YAML.safe_load(File.read(path), aliases: true)
+            abort("#{path} must be a YAML mapping") unless data.is_a?(Hash)
+            data
+          rescue Psych::SyntaxError => error
+            abort("#{path} has invalid YAML syntax: #{error.message}")
+          end
+
+          [
+            ".coderabbit.yaml",
+            ".kaizen/config.yml",
+            ".github/workflows/validate-coderabbit-config.yml",
+            ".github/ISSUE_TEMPLATE/kaizen.yml",
+            "skills/gh-link-issue-pr/agents/openai.yaml",
+            "skills/kaizen-bug-router/agents/openai.yaml"
+          ].each { |path| load_mapping(path) }
+
+          config = load_mapping(".coderabbit.yaml")
+          ["reviews", "knowledge_base"].each do |key|
+            abort(".coderabbit.yaml missing #{key}") unless config[key].is_a?(Hash)
+          end
+
+          reviews = config["reviews"]
+          abort(".coderabbit.yaml reviews.auto_review must be a mapping") unless reviews["auto_review"].is_a?(Hash)
+          abort(".coderabbit.yaml reviews.path_instructions must be a non-empty list") unless reviews["path_instructions"].is_a?(Array) && !reviews["path_instructions"].empty?
+
+          knowledge_base = config["knowledge_base"]
+          abort(".coderabbit.yaml knowledge_base.code_guidelines must be a mapping") unless knowledge_base["code_guidelines"].is_a?(Hash)
+
+          kaizen = load_mapping(".kaizen/config.yml")
+          verify = kaizen.dig("commands", "verify")
+          abort(".kaizen/config.yml commands.verify must be a non-empty list") unless verify.is_a?(Array) && !verify.empty?
+
+          [
+            "skills/gh-link-issue-pr/SKILL.md",
+            "skills/gh-link-issue-pr/agents/openai.yaml",
+            "skills/kaizen-bug-router/SKILL.md",
+            "skills/kaizen-bug-router/agents/openai.yaml",
+            "skills/pr-guardian/SKILL.md"
+          ].each do |path|
+            abort("#{path} must exist and be non-empty") unless File.file?(path) && !File.zero?(path)
+          end
+          RUBY
+
+      - name: Validate README setup guidance
+        run: |
+          for repo in ".github" "builder-agent" "kaizen-loop" "renovate-config" "verifier"; do
+            grep -q -- "\`$repo\`" README.md
+          done
+          grep -qi "coderabbit.*special case" README.md
