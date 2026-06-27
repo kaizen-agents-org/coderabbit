@@ -13,9 +13,7 @@ flowchart LR
     Eligible -->|non-draft human PR| Config["load coderabbit/.coderabbit.yaml"]
     Config --> Review["CodeRabbit review<br/>assertive profile"]
     Review --> Findings["summary, status,<br/>actionable findings"]
-    Findings --> Gate{"blocking issue?"}
-    Gate -->|yes| Changes["request changes"]
-    Gate -->|no| Continue["leave review context<br/>for human maintainer"]
+    Findings --> Continue["leave review context<br/>for human maintainer"]
 ```
 
 ## What The Configuration Does
@@ -23,7 +21,7 @@ flowchart LR
 | Area | Setting | Effect |
 |---|---|---|
 | Review profile | `reviews.profile: assertive` | Favors direct, actionable findings. |
-| Review workflow | `request_changes_workflow: true` | Allows CodeRabbit to request changes for blocking findings. |
+| Review workflow | `request_changes_workflow: false` | Keeps CodeRabbit findings advisory so merge does not depend on a later CodeRabbit approval. |
 | Summaries | `high_level_summary: true`, `review_status: true` | Adds PR-level summary and status output. |
 | Noise reduction | `review_details: false`, `poem: false` | Avoids decorative or verbose review output. |
 | Auto review | `auto_review.enabled: true` | Reviews eligible non-draft PRs automatically. |
