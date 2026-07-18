@@ -27,6 +27,7 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   repository(owner:$owner, name:$name) {
     pullRequest(number:$number) {
       headRefOid
+      headRepository { nameWithOwner }
       reviewDecision
       mergeStateStatus
       reviewThreads(first:100, after:$cursor) {
@@ -130,14 +131,15 @@ query($threadId:ID!, $cursor:String) {
 done
 ```
 
-Exhaust each REST endpoint with `--paginate`; summaries and first pages are incomplete evidence:
+Exhaust each REST endpoint with `--paginate`; summaries and first pages are incomplete evidence. Check runs can be owned by either side of a fork PR: head-repository workflows usually create runs in the head repository, while base-repository Actions and installed apps can create them in the base repository. Read `headRepository.nameWithOwner` from the GraphQL response above, query both base and head repositories when they differ, and retain the repository name alongside every returned check-run ID. Fetch each run's annotations from the same repository that returned it, deduplicating identical run IDs. If either repository query fails or the head repository is unavailable, stop and report the audit as incomplete.
 
 ```sh
 gh api --paginate 'repos/<owner>/<repo>/pulls/<pr>/reviews?per_page=100'
 gh api --paginate 'repos/<owner>/<repo>/pulls/<pr>/comments?per_page=100'
 gh api --paginate 'repos/<owner>/<repo>/issues/<pr>/comments?per_page=100'
 gh api --paginate 'repos/<owner>/<repo>/commits/<head-sha>/check-runs?per_page=100'
-gh api --paginate 'repos/<owner>/<repo>/check-runs/<check-run-id>/annotations?per_page=100'
+gh api --paginate 'repos/<head-owner>/<head-repo>/commits/<head-sha>/check-runs?per_page=100' # when different
+gh api --paginate 'repos/<check-run-owner>/<check-run-repo>/check-runs/<check-run-id>/annotations?per_page=100'
 ```
 
 ## Reply, then resolve
