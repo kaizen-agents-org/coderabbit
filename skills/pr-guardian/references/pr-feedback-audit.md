@@ -27,6 +27,7 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   repository(owner:$owner, name:$name) {
     pullRequest(number:$number) {
       headRefOid
+      headRepository { nameWithOwner }
       reviewDecision
       mergeStateStatus
       reviewThreads(first:100, after:$cursor) {
@@ -106,14 +107,14 @@ query($threadId:ID!, $cursor:String) {
 done
 ```
 
-Exhaust each REST endpoint with `--paginate`; summaries and first pages are incomplete evidence:
+Exhaust each REST endpoint with `--paginate`; summaries and first pages are incomplete evidence. Read `headRepository.nameWithOwner` from the GraphQL response above and use that repository for check runs and annotations. This matters for fork PRs because check endpoints only find runs created in the repository that received the head commit. If the head repository is unavailable, stop and report the audit as incomplete.
 
 ```sh
 gh api --paginate 'repos/<owner>/<repo>/pulls/<pr>/reviews?per_page=100'
 gh api --paginate 'repos/<owner>/<repo>/pulls/<pr>/comments?per_page=100'
 gh api --paginate 'repos/<owner>/<repo>/issues/<pr>/comments?per_page=100'
-gh api --paginate 'repos/<owner>/<repo>/commits/<head-sha>/check-runs?per_page=100'
-gh api --paginate 'repos/<owner>/<repo>/check-runs/<check-run-id>/annotations?per_page=100'
+gh api --paginate 'repos/<head-owner>/<head-repo>/commits/<head-sha>/check-runs?per_page=100'
+gh api --paginate 'repos/<head-owner>/<head-repo>/check-runs/<check-run-id>/annotations?per_page=100'
 ```
 
 ## Reply, then resolve
