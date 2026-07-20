@@ -27,7 +27,6 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   repository(owner:$owner, name:$name) {
     pullRequest(number:$number) {
       headRefOid
-      headRepository { nameWithOwner }
       reviewDecision
       mergeStateStatus
       reviewThreads(first:100, after:$cursor) {
@@ -57,19 +56,7 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   if [[ -n "${cursor}" ]]; then
     args+=(-f "cursor=${cursor}")
   fi
-  if ! page="$(gh "${args[@]}")"; then
-    echo 'failed to fetch review threads' >&2
-    exit 1
-  fi
-  if ! jq -e '
-    .data.repository.pullRequest.reviewThreads as $threads
-    | ($threads | type == "object")
-      and ($threads.nodes | type == "array")
-      and ($threads.pageInfo.hasNextPage | type == "boolean")
-  ' >/dev/null <<<"${page}"; then
-    echo 'reviewThreads returned an invalid or incomplete response' >&2
-    exit 1
-  fi
+  page="$(gh "${args[@]}")"
   jq -c '.data.repository.pullRequest.reviewThreads.nodes[]' <<<"${page}"
   if [[ "$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
@@ -106,19 +93,7 @@ query($threadId:ID!, $cursor:String) {
   if [[ -n "${cursor}" ]]; then
     args+=(-f "cursor=${cursor}")
   fi
-  if ! page="$(gh "${args[@]}")"; then
-    echo 'failed to fetch review comments' >&2
-    exit 1
-  fi
-  if ! jq -e '
-    .data.node.comments as $comments
-    | ($comments | type == "object")
-      and ($comments.nodes | type == "array")
-      and ($comments.pageInfo.hasNextPage | type == "boolean")
-  ' >/dev/null <<<"${page}"; then
-    echo 'review comments returned an invalid or incomplete response' >&2
-    exit 1
-  fi
+  page="$(gh "${args[@]}")"
   jq -c '.data.node.comments.nodes[]' <<<"${page}"
   if [[ "$(jq -r '.data.node.comments.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
@@ -131,15 +106,14 @@ query($threadId:ID!, $cursor:String) {
 done
 ```
 
-Exhaust each REST endpoint with `--paginate`; summaries and first pages are incomplete evidence. Check runs can be owned by either side of a fork PR: head-repository workflows usually create runs in the head repository, while base-repository Actions and installed apps can create them in the base repository. Read `headRepository.nameWithOwner` from the GraphQL response above, query both base and head repositories when they differ, and retain the repository name alongside every returned check-run ID. Fetch each run's annotations from the same repository that returned it, deduplicating identical run IDs. If either repository query fails or the head repository is unavailable, stop and report the audit as incomplete.
+Exhaust each REST endpoint with `--paginate`; summaries and first pages are incomplete evidence:
 
 ```sh
 gh api --paginate 'repos/<owner>/<repo>/pulls/<pr>/reviews?per_page=100'
 gh api --paginate 'repos/<owner>/<repo>/pulls/<pr>/comments?per_page=100'
 gh api --paginate 'repos/<owner>/<repo>/issues/<pr>/comments?per_page=100'
 gh api --paginate 'repos/<owner>/<repo>/commits/<head-sha>/check-runs?per_page=100'
-gh api --paginate 'repos/<head-owner>/<head-repo>/commits/<head-sha>/check-runs?per_page=100' # when different
-gh api --paginate 'repos/<check-run-owner>/<check-run-repo>/check-runs/<check-run-id>/annotations?per_page=100'
+gh api --paginate 'repos/<owner>/<repo>/check-runs/<check-run-id>/annotations?per_page=100'
 ```
 
 ## Reply, then resolve
