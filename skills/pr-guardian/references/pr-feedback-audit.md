@@ -76,7 +76,7 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
         and (.comments | type == "object")
         and (.comments.nodes | type == "array")
         and all(.comments.nodes[];
-          ((.fullDatabaseId | type) == "string" or (.fullDatabaseId | type) == "number")
+          ((.fullDatabaseId | type) == "string" and (.fullDatabaseId | test("^[0-9]+$")))
           and (.url | type == "string")
           and ((.author == null) or ((.author | type == "object") and (.author.login | type == "string")))
           and (.body | type == "string")
@@ -93,11 +93,16 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   if [[ "$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
   fi
-  cursor="$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"${page}")"
-  if [[ -z "${cursor}" || "${cursor}" == null ]]; then
+  next_cursor="$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"${page}")"
+  if [[ -z "${next_cursor}" || "${next_cursor}" == null ]]; then
     echo 'reviewThreads reported another page without an endCursor' >&2
     exit 1
   fi
+  if [[ -n "${cursor}" && "${next_cursor}" == "${cursor}" ]]; then
+    echo 'reviewThreads returned a repeated endCursor' >&2
+    exit 1
+  fi
+  cursor="${next_cursor}"
 done
 ```
 
@@ -135,7 +140,7 @@ query($threadId:ID!, $cursor:String) {
     | ($comments | type == "object")
       and ($comments.nodes | type == "array")
       and all($comments.nodes[];
-        ((.fullDatabaseId | type) == "string" or (.fullDatabaseId | type) == "number")
+        ((.fullDatabaseId | type) == "string" and (.fullDatabaseId | test("^[0-9]+$")))
         and (.url | type == "string")
         and ((.author == null) or ((.author | type == "object") and (.author.login | type == "string")))
         and (.body | type == "string")
@@ -152,11 +157,16 @@ query($threadId:ID!, $cursor:String) {
   if [[ "$(jq -r '.data.node.comments.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
   fi
-  cursor="$(jq -r '.data.node.comments.pageInfo.endCursor' <<<"${page}")"
-  if [[ -z "${cursor}" || "${cursor}" == null ]]; then
+  next_cursor="$(jq -r '.data.node.comments.pageInfo.endCursor' <<<"${page}")"
+  if [[ -z "${next_cursor}" || "${next_cursor}" == null ]]; then
     echo 'review comments reported another page without an endCursor' >&2
     exit 1
   fi
+  if [[ -n "${cursor}" && "${next_cursor}" == "${cursor}" ]]; then
+    echo 'review comments returned a repeated endCursor' >&2
+    exit 1
+  fi
+  cursor="${next_cursor}"
 done
 ```
 
