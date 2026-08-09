@@ -76,7 +76,7 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
         and (.comments | type == "object")
         and (.comments.nodes | type == "array")
         and all(.comments.nodes[];
-          ((.fullDatabaseId | type) == "string" and (.fullDatabaseId | test("^[0-9]+$")))
+          ((.fullDatabaseId | type) == "string" or (.fullDatabaseId | type) == "number")
           and (.url | type == "string")
           and ((.author == null) or ((.author | type == "object") and (.author.login | type == "string")))
           and (.body | type == "string")
@@ -140,7 +140,7 @@ query($threadId:ID!, $cursor:String) {
     | ($comments | type == "object")
       and ($comments.nodes | type == "array")
       and all($comments.nodes[];
-        ((.fullDatabaseId | type) == "string" and (.fullDatabaseId | test("^[0-9]+$")))
+        ((.fullDatabaseId | type) == "string" or (.fullDatabaseId | type) == "number")
         and (.url | type == "string")
         and ((.author == null) or ((.author | type == "object") and (.author.login | type == "string")))
         and (.body | type == "string")
