@@ -106,11 +106,11 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
 done
 ```
 
-For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id`:
+For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id` and the already-consumed outer `comments.pageInfo.endCursor`. Initialize `cursor` empty only when no comments page has been consumed yet:
 
 ```sh
 thread_id='<review-thread-id>'
-cursor=
+cursor='<endCursor from the outer comments.pageInfo response>'
 while :; do
   args=(
     api graphql
