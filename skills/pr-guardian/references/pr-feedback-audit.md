@@ -14,7 +14,7 @@ gh pr checks <pr> --repo <owner/repo>
 
 Run this loop. It feeds each `pageInfo.endCursor` into the next request and stops only when `hasNextPage` is false:
 
-```sh
+```bash
 cursor=
 while :; do
   args=(
@@ -93,19 +93,24 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   if [[ "$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
   fi
+  previous_cursor="${cursor}"
   cursor="$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"${page}")"
   if [[ -z "${cursor}" || "${cursor}" == null ]]; then
     echo 'reviewThreads reported another page without an endCursor' >&2
     exit 1
   fi
+  if [[ -n "${previous_cursor}" && "${cursor}" == "${previous_cursor}" ]]; then
+    echo 'reviewThreads returned a repeated endCursor' >&2
+    exit 1
+  fi
 done
 ```
 
-For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id`:
+For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id` and the already-consumed outer `comments.pageInfo.endCursor`:
 
-```sh
+```bash
 thread_id='<review-thread-id>'
-cursor=
+cursor='<endCursor from the outer comments.pageInfo response>'
 while :; do
   args=(
     api graphql
@@ -152,9 +157,14 @@ query($threadId:ID!, $cursor:String) {
   if [[ "$(jq -r '.data.node.comments.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
   fi
+  previous_cursor="${cursor}"
   cursor="$(jq -r '.data.node.comments.pageInfo.endCursor' <<<"${page}")"
   if [[ -z "${cursor}" || "${cursor}" == null ]]; then
     echo 'review comments reported another page without an endCursor' >&2
+    exit 1
+  fi
+  if [[ -n "${previous_cursor}" && "${cursor}" == "${previous_cursor}" ]]; then
+    echo 'review comments returned a repeated endCursor' >&2
     exit 1
   fi
 done
