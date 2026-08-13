@@ -1,3 +1,4 @@
+/Users/hiraoku.shinichi/.zlogin:9: nice(5) failed: operation not permitted
 # PR Feedback Audit
 
 Use an explicit pull request URL or repository and number. Resolve a usable `gh` executable and authenticate to the target host before running the audit.
@@ -14,14 +15,14 @@ gh pr checks <pr> --repo <owner/repo>
 
 Run this loop. It feeds each `pageInfo.endCursor` into the next request and stops only when `hasNextPage` is false:
 
-```sh
+```bash
 cursor=
 while :; do
   args=(
     api graphql
     -f owner='<owner>'
     -f name='<repo>'
-    -F number=<number>
+    -F number='<number>'
     -f query='
 query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   repository(owner:$owner, name:$name) {
@@ -93,19 +94,24 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   if [[ "$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
   fi
-  cursor="$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"${page}")"
-  if [[ -z "${cursor}" || "${cursor}" == null ]]; then
+  next_cursor="$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"${page}")"
+  if [[ -z "${next_cursor}" || "${next_cursor}" == null ]]; then
     echo 'reviewThreads reported another page without an endCursor' >&2
     exit 1
   fi
+  if [[ "${next_cursor}" == "${cursor}" ]]; then
+    echo 'reviewThreads pagination cursor did not advance' >&2
+    exit 1
+  fi
+  cursor="${next_cursor}"
 done
 ```
 
 For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id`:
 
-```sh
+```bash
 thread_id='<review-thread-id>'
-cursor=
+cursor='<comments-end-cursor-from-outer-query>'
 while :; do
   args=(
     api graphql
@@ -152,11 +158,16 @@ query($threadId:ID!, $cursor:String) {
   if [[ "$(jq -r '.data.node.comments.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
   fi
-  cursor="$(jq -r '.data.node.comments.pageInfo.endCursor' <<<"${page}")"
-  if [[ -z "${cursor}" || "${cursor}" == null ]]; then
+  next_cursor="$(jq -r '.data.node.comments.pageInfo.endCursor' <<<"${page}")"
+  if [[ -z "${next_cursor}" || "${next_cursor}" == null ]]; then
     echo 'review comments reported another page without an endCursor' >&2
     exit 1
   fi
+  if [[ "${next_cursor}" == "${cursor}" ]]; then
+    echo 'review comments pagination cursor did not advance' >&2
+    exit 1
+  fi
+  cursor="${next_cursor}"
 done
 ```
 
