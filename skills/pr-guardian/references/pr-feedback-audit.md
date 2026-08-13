@@ -1,4 +1,3 @@
-/Users/hiraoku.shinichi/.zlogin:9: nice(5) failed: operation not permitted
 # PR Feedback Audit
 
 Use an explicit pull request URL or repository and number. Resolve a usable `gh` executable and authenticate to the target host before running the audit.
@@ -68,7 +67,10 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
       and ($threads.nodes | type == "array")
       and ($threads.pageInfo | type == "object")
       and ($threads.pageInfo.hasNextPage | type == "boolean")
-      and (($threads.pageInfo.endCursor == null) or ($threads.pageInfo.endCursor | type == "string"))
+      and (if $threads.pageInfo.hasNextPage
+        then (($threads.pageInfo.endCursor | type) == "string" and ($threads.pageInfo.endCursor | length) > 0)
+        else (($threads.pageInfo.endCursor == null) or ($threads.pageInfo.endCursor | type == "string"))
+        end)
       and all($threads.nodes[];
         (.id | type == "string")
         and (.isResolved | type == "boolean")
@@ -85,7 +87,10 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
           and (.outdated | type == "boolean"))
         and (.comments.pageInfo | type == "object")
         and (.comments.pageInfo.hasNextPage | type == "boolean")
-        and ((.comments.pageInfo.endCursor == null) or (.comments.pageInfo.endCursor | type == "string"))))
+        and (if .comments.pageInfo.hasNextPage
+          then ((.comments.pageInfo.endCursor | type) == "string" and (.comments.pageInfo.endCursor | length) > 0)
+          else ((.comments.pageInfo.endCursor == null) or (.comments.pageInfo.endCursor | type == "string"))
+          end)))
   ' >/dev/null <<<"${page}"; then
     echo 'reviewThreads returned an incomplete response' >&2
     exit 1
@@ -149,7 +154,10 @@ query($threadId:ID!, $cursor:String) {
         and (.outdated | type == "boolean"))
       and ($comments.pageInfo | type == "object")
       and ($comments.pageInfo.hasNextPage | type == "boolean")
-      and (($comments.pageInfo.endCursor == null) or ($comments.pageInfo.endCursor | type == "string")))
+      and (if $comments.pageInfo.hasNextPage
+        then (($comments.pageInfo.endCursor | type) == "string" and ($comments.pageInfo.endCursor | length) > 0)
+        else (($comments.pageInfo.endCursor == null) or ($comments.pageInfo.endCursor | type == "string"))
+        end))
   ' >/dev/null <<<"${page}"; then
     echo 'review comments returned an incomplete response' >&2
     exit 1
