@@ -21,7 +21,7 @@ while :; do
     api graphql
     -f owner='<owner>'
     -f name='<repo>'
-    -F number=<number>
+    -F number='<number>'
     -f query='
 query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   repository(owner:$owner, name:$name) {
@@ -67,7 +67,10 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
       and ($threads.nodes | type == "array")
       and ($threads.pageInfo | type == "object")
       and ($threads.pageInfo.hasNextPage | type == "boolean")
-      and (($threads.pageInfo.endCursor == null) or ($threads.pageInfo.endCursor | type == "string"))
+      and (if $threads.pageInfo.hasNextPage
+        then (($threads.pageInfo.endCursor | type) == "string" and ($threads.pageInfo.endCursor | length) > 0)
+        else (($threads.pageInfo.endCursor == null) or ($threads.pageInfo.endCursor | type == "string"))
+        end)
       and all($threads.nodes[];
         (.id | type == "string")
         and (.isResolved | type == "boolean")
@@ -84,10 +87,10 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
           and (.outdated | type == "boolean"))
         and (.comments.pageInfo | type == "object")
         and (.comments.pageInfo.hasNextPage | type == "boolean")
-        and ((.comments.pageInfo.endCursor == null) or (.comments.pageInfo.endCursor | type == "string"))
-        and ((.comments.pageInfo.hasNextPage == false)
-          or ((.comments.pageInfo.endCursor | type) == "string"
-            and (.comments.pageInfo.endCursor | length) > 0))))
+        and (if .comments.pageInfo.hasNextPage
+          then ((.comments.pageInfo.endCursor | type) == "string" and (.comments.pageInfo.endCursor | length) > 0)
+          else ((.comments.pageInfo.endCursor == null) or (.comments.pageInfo.endCursor | type == "string"))
+          end)))
   ' >/dev/null <<<"${page}"; then
     echo 'reviewThreads returned an incomplete response' >&2
     exit 1
@@ -102,18 +105,18 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
     exit 1
   fi
   if [[ "${next_cursor}" == "${cursor}" ]]; then
-    echo 'reviewThreads returned a repeated endCursor' >&2
+    echo 'reviewThreads pagination cursor did not advance' >&2
     exit 1
   fi
   cursor="${next_cursor}"
 done
 ```
 
-For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id` and the already-consumed outer `comments.pageInfo.endCursor`:
+For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id`:
 
 ```bash
 thread_id='<review-thread-id>'
-cursor='<endCursor from the outer comments.pageInfo response>'
+cursor='<comments-end-cursor-from-outer-query>'
 while :; do
   args=(
     api graphql
@@ -151,7 +154,10 @@ query($threadId:ID!, $cursor:String) {
         and (.outdated | type == "boolean"))
       and ($comments.pageInfo | type == "object")
       and ($comments.pageInfo.hasNextPage | type == "boolean")
-      and (($comments.pageInfo.endCursor == null) or ($comments.pageInfo.endCursor | type == "string")))
+      and (if $comments.pageInfo.hasNextPage
+        then (($comments.pageInfo.endCursor | type) == "string" and ($comments.pageInfo.endCursor | length) > 0)
+        else (($comments.pageInfo.endCursor == null) or ($comments.pageInfo.endCursor | type == "string"))
+        end))
   ' >/dev/null <<<"${page}"; then
     echo 'review comments returned an incomplete response' >&2
     exit 1
@@ -166,7 +172,7 @@ query($threadId:ID!, $cursor:String) {
     exit 1
   fi
   if [[ "${next_cursor}" == "${cursor}" ]]; then
-    echo 'review comments returned a repeated endCursor' >&2
+    echo 'review comments pagination cursor did not advance' >&2
     exit 1
   fi
   cursor="${next_cursor}"
