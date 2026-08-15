@@ -4,28 +4,24 @@ Use an explicit pull request URL or repository and number. Resolve a usable `gh`
 
 ## Read state and checks
 
-```bash
-owner='owner'
-repo='repo'
-pr_number=123
-
-gh pr view "${pr_number}" --repo "${owner}/${repo}" \
+```sh
+gh pr view <pr> --repo <owner/repo> \
   --json url,headRefOid,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,reviews,comments,latestReviews,reviewRequests
-gh pr checks "${pr_number}" --repo "${owner}/${repo}"
+gh pr checks <pr> --repo <owner/repo>
 ```
 
 ## Read every review thread
 
 Run this loop. It feeds each `pageInfo.endCursor` into the next request and stops only when `hasNextPage` is false:
 
-```bash
+```sh
 cursor=
 while :; do
   args=(
     api graphql
-    -f "owner=${owner}"
-    -f "name=${repo}"
-    -F "number=${pr_number}"
+    -f owner='<owner>'
+    -f name='<repo>'
+    -F number=<number>
     -f query='
 query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   repository(owner:$owner, name:$name) {
@@ -88,10 +84,7 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
           and (.outdated | type == "boolean"))
         and (.comments.pageInfo | type == "object")
         and (.comments.pageInfo.hasNextPage | type == "boolean")
-        and ((.comments.pageInfo.endCursor == null) or (.comments.pageInfo.endCursor | type == "string"))
-        and ((.comments.pageInfo.hasNextPage == false)
-          or ((.comments.pageInfo.endCursor | type) == "string"
-            and (.comments.pageInfo.endCursor | length) > 0))))
+        and ((.comments.pageInfo.endCursor == null) or (.comments.pageInfo.endCursor | type == "string"))))
   ' >/dev/null <<<"${page}"; then
     echo 'reviewThreads returned an incomplete response' >&2
     exit 1
@@ -100,24 +93,19 @@ query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
   if [[ "$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
   fi
-  next_cursor="$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"${page}")"
-  if [[ -z "${next_cursor}" || "${next_cursor}" == null ]]; then
+  cursor="$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' <<<"${page}")"
+  if [[ -z "${cursor}" || "${cursor}" == null ]]; then
     echo 'reviewThreads reported another page without an endCursor' >&2
     exit 1
   fi
-  if [[ "${next_cursor}" == "${cursor}" ]]; then
-    echo 'reviewThreads pagination cursor did not advance' >&2
-    exit 1
-  fi
-  cursor="${next_cursor}"
 done
 ```
 
-For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id`. Initialize `cursor` from the `comments.pageInfo.endCursor` returned for that thread by the outer query so the first 100 comments are not fetched twice:
+For every thread whose nested `comments.pageInfo.hasNextPage` is true, run the corresponding comment loop with that thread's GraphQL `id`:
 
-```bash
-thread_id='PRRT_replace_with_review_thread_id'
-cursor='replace-with-outer-comments-endCursor'
+```sh
+thread_id='<review-thread-id>'
+cursor=
 while :; do
   args=(
     api graphql
@@ -164,50 +152,39 @@ query($threadId:ID!, $cursor:String) {
   if [[ "$(jq -r '.data.node.comments.pageInfo.hasNextPage' <<<"${page}")" != true ]]; then
     break
   fi
-  next_cursor="$(jq -r '.data.node.comments.pageInfo.endCursor' <<<"${page}")"
-  if [[ -z "${next_cursor}" || "${next_cursor}" == null ]]; then
+  cursor="$(jq -r '.data.node.comments.pageInfo.endCursor' <<<"${page}")"
+  if [[ -z "${cursor}" || "${cursor}" == null ]]; then
     echo 'review comments reported another page without an endCursor' >&2
     exit 1
   fi
-  if [[ "${next_cursor}" == "${cursor}" ]]; then
-    echo 'review comments pagination cursor did not advance' >&2
-    exit 1
-  fi
-  cursor="${next_cursor}"
 done
 ```
 
 Exhaust each REST endpoint with `--paginate`; summaries and first pages are incomplete evidence:
 
-```bash
-head_sha='replace-with-full-head-sha'
-
-gh api --paginate "repos/${owner}/${repo}/pulls/${pr_number}/reviews?per_page=100"
-gh api --paginate "repos/${owner}/${repo}/pulls/${pr_number}/comments?per_page=100"
-gh api --paginate "repos/${owner}/${repo}/issues/${pr_number}/comments?per_page=100"
-gh api --paginate "repos/${owner}/${repo}/commits/${head_sha}/check-runs?per_page=100"
-
-check_run_id=123
-gh api --paginate "repos/${owner}/${repo}/check-runs/${check_run_id}/annotations?per_page=100"
+```sh
+gh api --paginate 'repos/<owner>/<repo>/pulls/<pr>/reviews?per_page=100'
+gh api --paginate 'repos/<owner>/<repo>/pulls/<pr>/comments?per_page=100'
+gh api --paginate 'repos/<owner>/<repo>/issues/<pr>/comments?per_page=100'
+gh api --paginate 'repos/<owner>/<repo>/commits/<head-sha>/check-runs?per_page=100'
+gh api --paginate 'repos/<owner>/<repo>/check-runs/<check-run-id>/annotations?per_page=100'
 ```
 
 ## Reply, then resolve
 
 For every addressed thread, reply to its first comment using `fullDatabaseId` after the fix is pushed and verified:
 
-```bash
-first_comment_id=123
+```sh
 gh api --method POST \
-  "repos/${owner}/${repo}/pulls/${pr_number}/comments/${first_comment_id}/replies" \
+  repos/<owner>/<repo>/pulls/<pr>/comments/<first-comment-full-database-id>/replies \
   -f body='Fixed in <commit>: <disposition>. Verified with <command>.'
 ```
 
 Then resolve the thread using its GraphQL `id`:
 
-```bash
-thread_id='PRRT_replace_with_review_thread_id'
+```sh
 gh api graphql \
-  -f "threadId=${thread_id}" \
+  -f threadId='<review-thread-id>' \
   -f query='
 mutation($threadId:ID!) {
   resolveReviewThread(input:{threadId:$threadId}) {
